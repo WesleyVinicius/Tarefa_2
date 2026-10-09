@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:15.3-alpine
+    container_name: catalogo_livros_tarefa2
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: catalogo_livros
+    ports:
+      - "5433:5432" # Usei a porta 5433 para evitar conflito com o PostgreSQL local
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
