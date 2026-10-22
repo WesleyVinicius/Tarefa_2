@@ -1,0 +1,117 @@
+# Tarefa 2 – CRUD de Livros (Express + Prisma + Zod)
+
+API REST em Node.js + TypeScript para o catálogo de livros. A entidade adotada é **Book** (`title`, `author`), no lugar de "produtos".
+
+**Stack:** Express, Prisma, PostgreSQL (Docker), Zod, CORS.
+
+## Passo a passo
+
+1. Instalar dependências:
+   ```bash
+   npm install
+   ```
+2. Criar o `.env` a partir do exemplo:
+   ```bash
+   cp .env.example .env
+   ```
+3. Subir o Postgres no Docker (porta local **5433**):
+   ```bash
+   docker compose up -d
+   ```
+4. Rodar a migration (também gera o Prisma Client):
+   ```bash
+   npm run prisma:migrate
+   ```
+5. Popular o banco (5 livros):
+   ```bash
+   npm run seed
+   ```
+6. Iniciar o servidor (http://localhost:3001):
+   ```bash
+   npm run dev
+   ```
+7. Ver os dados no Prisma Studio:
+   ```bash
+   npm run prisma:studio
+   ```
+
+## Variáveis de ambiente (`.env`)
+
+| Chave | Descrição | Exemplo |
+|---|---|---|
+| `DATABASE_URL` | Conexão com o Postgres | `postgresql://admin:admin123@localhost:5433/catalogo_livros?schema=public` |
+| `ALLOWED_ORIGIN` | Origem permitida no CORS | `http://localhost:5173` |
+| `PORT` | Porta da API | `3001` |
+
+## Política de CORS
+
+- **Origem:** somente `ALLOWED_ORIGIN` (padrão `http://localhost:5173`, o front-end em desenvolvimento). Qualquer outra origem é bloqueada pelo navegador.
+- **Métodos:** `GET`, `POST`, `PUT`, `DELETE`, que são os usados pela API.
+- **Headers:** `Content-Type`, necessário para enviar JSON.
+
+Liberar só o necessário reduz a superfície de ataque em comparação com `origin: *`.
+
+## Endpoints
+
+| Método | Rota | Sucesso | Erros |
+|---|---|---|---|
+| GET | `/api/books` | 200 | 500 |
+| GET | `/api/books/:id` | 200 | 400 (ID inválido), 404, 500 |
+| POST | `/api/books` | 201 | 400 (payload inválido), 500 |
+| PUT | `/api/books/:id` | 200 | 400 (ID ou payload inválido), 404, 500 |
+| DELETE | `/api/books/:id` | 204 | 400 (ID inválido), 404, 500 |
+
+## Validação com Zod
+
+- Criação: `title` com no mínimo 3 caracteres; `author` com no mínimo 3 caracteres.
+- Atualização (PUT): o mesmo schema com `.partial()`, então todos os campos são opcionais, mas os enviados continuam validados.
+- No `catch`: `ZodError` → 400, Prisma `P2025` (registro inexistente) → 404, qualquer outro erro → 500.
+
+## Exemplos de payload
+
+**POST `/api/books`** (201):
+```json
+{ "title": "Memórias Póstumas de Brás Cubas", "author": "Machado de Assis" }
+```
+
+**POST inválido** (400):
+```json
+{ "title": "Oi", "author": "" }
+```
+Resposta:
+```json
+{
+  "error": "Payload inválido",
+  "issues": [
+    { "path": "title", "message": "O título deve ter pelo menos 3 caracteres" },
+    { "path": "author", "message": "O autor deve ter pelo menos 3 caracteres" }
+  ]
+}
+```
+
+**PUT `/api/books/1`** (200, atualização parcial):
+```json
+{ "title": "Dom Casmurro (edição revisada)" }
+```
+
+## Testes no Insomnia
+
+Importe o arquivo `insomnia-workspace.json` (Application → Import). Cada requisição tem nas notas o status esperado:
+
+| Requisição | Status esperado |
+|---|---|
+| GET /api/books | 200 |
+| GET /api/books/1 | 200 |
+| GET /api/books/abc | 400 |
+| GET /api/books/99999 | 404 |
+| POST válido | 201 |
+| POST inválido | 400 |
+| PUT válido | 200 |
+| PUT inválido (título curto) | 400 |
+| PUT ID inexistente | 404 |
+| DELETE válido | 204 |
+| DELETE inexistente | 404 |
+
+O status 500 acontece apenas em falha interna (por exemplo, banco fora do ar: `docker compose stop`).
+
+> Os IDs de exemplo (1, 99999) dependem do banco. Se o seed foi rodado mais de uma vez, confira os IDs reais no Prisma Studio.
